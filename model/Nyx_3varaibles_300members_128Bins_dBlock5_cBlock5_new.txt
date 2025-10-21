@@ -1,0 +1,7 @@
+Data Size:60
+BinNumbers:128
+Variable Number:3
+Cov Block Size:5
+v0 non zero bins count: 17.239583333333332
+v1 non zero bins count: 5.305555555555555
+v2 non zero bins count: 3.9027777777777777
