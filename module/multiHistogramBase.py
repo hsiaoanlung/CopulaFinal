@@ -9,10 +9,23 @@ class multiHistogramBlock():
         self.binEdges=binEdges
         self.dim=oriData.shape[0]
         self.oriData=self.oriData.reshape(self.dim,-1).T
-    def fit(self):
 
+        self.cpData=cp.asarray(self.oriData,dtype=cp.float32)
+        self.cpBinEdges=cp.asarray(self.binEdges,dtype=cp.float32)
+    def fit(self):
+        
         self.hist,_=np.histogramdd(self.oriData,bins=self.binEdges,)
 
+    def getHist(self):
+        hist,_=np.histogramdd(self.oriData,bins=self.binEdges,)
+        return hist
+    
+    def getHistCp(self):
+        #cpData=cp.asarray(self.oriData,dtype=cp.float32)
+        #cpBinEdges=cp.asarray(self.binEdges,dtype=cp.float32)
+        hist_gpu,_=cp.histogramdd(self.cpData,bins=self.cpBinEdges)
+        return hist_gpu
+    
     def clear(self):
         self.hist=[]
 
@@ -164,6 +177,15 @@ class multiHistogramModel():
         blockZ, blockY, blockX = z//blockSize, y//blockSize, x//blockSize
         blockIdx = blockZ * (blockWidthY*blockWidthX) + blockY * blockWidthX + blockX
         return blockIdx
+    def getHistByPos(self,z,y,x):
+        blockIdx=self.getBlockIdx(z,y,x,self.blockSize)
+        hist=self.blocks[blockIdx].getHist()
+        return hist
+    
+    def getHistByPosCp(self,z,y,x):
+        blockIdx=self.getBlockIdx(z,y,x,self.blockSize)
+        hist=self.blocks[blockIdx].getHistCp()
+        return hist
     
     def sampleByPos(self,z,y,x,size=1000):
 
