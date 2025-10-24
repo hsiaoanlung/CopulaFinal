@@ -12,17 +12,18 @@ import time
 from multiprocessing import Pool
 from sklearn.metrics import root_mean_squared_error
 import cupy as cp
+import module.multiHistogramSparse as multiHistogramSparse
 reload(utilize)
 reload(multiVariant)
 reload(singleVariant)
 reload(multiHistogramBase)
 reload(CopulaBase)
-
+reload(multiHistogramSparse)
 
 
 startTime=time.time()
 
-attribute_names=np.array(["phi_grav","particle_mass_density","zmom","ymom"])
+attribute_names=np.array(["phi_grav","particle_mass_density","zmom","ymom","xmom"])
 incremental_number=300
 all_ensamble_data=np.empty([0,incremental_number,64,64,64])
 
@@ -41,11 +42,11 @@ sizeY=60
 sizeX=60
 minMaxBlockSize=2
 isMinMax=False
-print("new")
+
 print("start fit model")
 with tqdm(total=4, desc="Model fitting") as pbar:
     #oursModel=multiVariant.multiDistCopula3D(all_ensamble_data,dataBlockSize,covBlockSize,binsNumber,[sizeZ,sizeY,sizeX],minMaxBlockSize,isMinMax)
-    oursModel=multiVariant.multiDistCopula3D.load(f"Nyx_{attribute_names.shape[0]}varaibles_{incremental_number}members_128Bins_dBlock5_cBlock5_new")
+    oursModel=multiVariant.multiDistCopula3D.load(f"Nyx_{attribute_names.shape[0]}varaibles_{incremental_number}members_128Bins_dBlock5_cBlock2_new")
     #conditions=np.array([[0,1e5],[3e10,5e10]])
     #oursModel.fit()
     print("ours complete fit")
@@ -56,24 +57,24 @@ with tqdm(total=4, desc="Model fitting") as pbar:
     print("copula complete fit")
     pbar.update(1)
     multiHistBlockSize=2
-    multiHistModel=multiHistogramBase.multiHistogramModel(all_ensamble_data,blockSize=multiHistBlockSize,binsNumber=binsNumber)
+    multiHistModel=multiHistogramSparse.multiHistogramSpaseModel(all_ensamble_data,blockSize=multiHistBlockSize,binsNumber=binsNumber)
     multiHistModel.fit()
     print("multi-hist complete fit")
     pbar.update(1)
-    gtModel=multiHistogramBase.multiHistogramModel(all_ensamble_data,blockSize=1,binsNumber=binsNumber)
+    gtModel=multiHistogramSparse.multiHistogramSpaseModel(all_ensamble_data,blockSize=1,binsNumber=binsNumber)
     gtModel.fit()
 
-    multiBinEdges=gtModel.blocks[0].binEdges
+    multiBinEdges=gtModel.vBinEdges
 
     print("complete fit")
     pbar.update(1)
 
-oursError=cp.zeros([sizeZ,sizeY,sizeX],dtype=cp.float32)
-copulaError=cp.zeros([sizeZ,sizeY,sizeX],dtype=cp.float32)
-mtError=cp.zeros([sizeZ,sizeY,sizeX],dtype=cp.float32)
+oursError=[]
+copulaError=[]
+mtError=[]
 
 
-multiBinEdges=cp.asarray(multiBinEdges,dtype=cp.float32)
+#multiBinEdges=cp.asarray(multiBinEdges,dtype=cp.float32)
 
 
 with tqdm(total=sizeZ*sizeY*sizeX, desc="總進度") as pbar:
@@ -84,51 +85,42 @@ with tqdm(total=sizeZ*sizeY*sizeX, desc="總進度") as pbar:
         x = idx % sizeX        
         ### GroundTruth ###
 
-        gtMultiHist=gtModel.getHistByPosCp(z,y,x)
-        gtMultiHist=gtMultiHist/cp.sum(gtMultiHist)
+        gtMultiHistModel=gtModel.getHistByPos(z,y,x)
 
         ### ours method ###
 
         oursSamples=oursModel.sampleByPos(z,y,x)
-        oursSamples=cp.asarray(oursSamples,dtype=cp.float32)
-        oursMultiHist,_=cp.histogramdd(oursSamples,bins=multiBinEdges)
-        oursMultiHist=oursMultiHist/cp.sum(oursMultiHist)
+        oursHistModel=multiHistogramSparse.SparseMultiHistogramBlock(bin_edges=multiBinEdges)
+        oursHistModel.add_samples(oursSamples)
+        oursHistModel.normalize()
 
-        #rmse=np.sqrt(np.mean((gtMultiHist-oursMultiHist)**2))
-        rmse = cp.sqrt(cp.mean((gtMultiHist - oursMultiHist) ** 2))
-        oursError[z,y,x]=rmse
-        #oursError.append(rmse)
+        rmse=multiHistogramSparse.rmseForSparseHistogram(gtMultiHistModel,oursHistModel)
+        oursError.append(rmse)
 
        
         ### copula Base ###
     
         copulaSamples=copulaBaseModel.sampleByPos(z,y,x)
-        copulaSamples=cp.asarray(copulaSamples,dtype=cp.float32)
-        copulaMultiHist,_=cp.histogramdd(copulaSamples,bins=multiBinEdges)
-        copulaMultiHist=copulaMultiHist/cp.sum(copulaMultiHist)
+        copulaHistModel=multiHistogramSparse.SparseMultiHistogramBlock(bin_edges=multiBinEdges)
+        copulaHistModel.add_samples(copulaSamples)
+        copulaHistModel.normalize()
       
-        rmse = cp.sqrt(cp.mean((gtMultiHist - copulaMultiHist) ** 2))
-        #rmse=np.sqrt(np.mean((gtMultiHist-copulaMultiHist)**2))
-        copulaError[z,y,x]=rmse
-        #copulaError.append(rmse)
+        rmse=multiHistogramSparse.rmseForSparseHistogram(gtMultiHistModel,copulaHistModel)
+        copulaError.append(rmse)
         
 
         ### multiHist ###
 
         ProcessTime=time.time()
         ProcessHistTime=time.time()
-        mtMultiHist=multiHistModel.getHistByPosCp(z,y,x)
-        mtMultiHist=mtMultiHist/cp.sum(mtMultiHist)
+        mtMultiHistModel=multiHistModel.getHistByPos(z,y,x)
         processHistTimeEnd=time.time()
         #print(f"multi hist hist 執行時間:{processHistTimeEnd-ProcessHistTime}")
         processRmseTime=time.time()
-        #rmse=root_mean_squared_error(gtMultiHist.flatten(),mtMultiHist.flatten())
-        #rmse=np.sqrt(np.mean((gtMultiHist-mtMultiHist)**2))
-        rmse = cp.sqrt(cp.mean((gtMultiHist - mtMultiHist) ** 2))
+        rmse=multiHistogramSparse.rmseForSparseHistogram(gtMultiHistModel,mtMultiHistModel)
         processRmseTimeEnd=time.time()
         #print(f"multi hist RMSE 執行時間:{processRmseTimeEnd-processRmseTime}")
-        mtError[z,y,x]=rmse
-        #mtError.append(rmse)
+        mtError.append(rmse)
 
         ProcessTimeEnd=time.time()
         #print(f"multi hist 執行時間:{ProcessTimeEnd-ProcessTime}")
@@ -136,13 +128,9 @@ with tqdm(total=sizeZ*sizeY*sizeX, desc="總進度") as pbar:
         pbar.update(1)
     
 
-#oursError=np.array(oursError)
-#copulaError=np.array(copulaError)
-#mtError=np.array(mtError)
-
-oursError=oursError.get()
-copulaError=copulaError.get()
-mtError=mtError.get()
+oursError=np.array(oursError)
+copulaError=np.array(copulaError)
+mtError=np.array(mtError)
 
 oursError=oursError.mean()
 copulaError=copulaError.mean()
@@ -150,7 +138,7 @@ mtError=mtError.mean()
 
 from datetime import datetime
 timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-Outputfilename = f"output_{timestamp}.txt"
+Outputfilename = f"Nyx_{attribute_names.shape[0]}varaibles_{timestamp}.txt"
 end_Time=time.time()
 
 with open(Outputfilename , "w", encoding="utf-8") as f:

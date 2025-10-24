@@ -228,3 +228,5 @@ class multiHistogramModel():
             
         counts=counts/len(self.blocks)
         return counts
+
+
