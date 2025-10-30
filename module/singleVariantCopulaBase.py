@@ -318,3 +318,13 @@ class multiVariantCopulaBase():
 
         samples=self.blocks[blockIdx].sampleByPos(localZ,localY,localX,size)
         return samples
+    
+    def getStorageSize(self,nonZeroCounts):
+        allNonZeroCounts=nonZeroCounts.sum()
+        dim=self.oriData.shape[0]+3
+
+        storageSize=(allNonZeroCounts*2+(1+dim+((dim*(dim+1))/2)))*len(self.blocks)
+
+        print(f"copula base storage:{storageSize}")
+        return storageSize
+

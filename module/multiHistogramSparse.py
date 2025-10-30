@@ -67,6 +67,12 @@ class SparseMultiHistogramBlock:
         r = np.random.rand(n_samples, self.ndim)
         return lows + r * (highs - lows)
     
+    def getStorageSize(self):
+        nonZeroBin=len(self.hist)
+        size=nonZeroBin*(self.ndim+1)
+
+        return size
+    
 class multiHistogramSpaseModel():
     def __init__(self,oriData:NDArray[np.float32],blockSize,binsNumber):
         self.oriData=oriData
@@ -121,6 +127,14 @@ class multiHistogramSpaseModel():
         blockIdx=self.getBlockIdx(z,y,x,self.blockSize)
         samples=self.blocks[blockIdx].sample(n_samples=size)
         return samples
+    
+    def getStorageSize(self):
+        result=0
+        for i in range(len(self.blocks)):
+            result+=self.blocks[i].getStorageSize()    
+        print(f"sparse sum: {result}")
+
+        return result
 
 def rmseForSparseHistogram(hist1, hist2):
     """

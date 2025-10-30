@@ -17,11 +17,11 @@ def readFiles(attribute_name,ensamble_member):
 
 def readRedSeaFile(attribute_name,filePath=None):
     if filePath==None:
-        f=open(f"../red_data/{attribute_name}_60_20_250_250.bin")
+        f=open(f"../red_data/{attribute_name}_180_20_250_250.bin")
     else:
-        f=open(filePath+f"{attribute_name}_60_20_250_250.bin")
+        f=open(filePath+f"{attribute_name}_180_20_250_250.bin")
     temp=np.fromfile(f,dtype=np.float32,count=-1)
-    temp=temp.reshape(60,20,250,250)
+    temp=temp.reshape(180,20,250,250)
     f.close()
 
     return temp

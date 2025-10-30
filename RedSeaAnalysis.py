@@ -1,0 +1,148 @@
+from importlib import reload ,import_module
+import module.utilize as utilize
+import module.multiVariant as multiVariant
+import module.singleVariant as singleVariant
+import module.multiHistogramBase as multiHistogramBase
+import numpy as np
+from numba import njit,jit, float32
+import module.singleVariantCopulaBase as CopulaBase
+from tqdm import tqdm
+import time
+from multiprocessing import Pool
+from sklearn.metrics import root_mean_squared_error
+import cupy as cp
+import module.multiHistogramSparse as multiHistogramSparse
+reload(utilize)
+reload(multiVariant)
+reload(singleVariant)
+reload(multiHistogramBase)
+reload(CopulaBase)
+reload(multiHistogramSparse)
+
+
+startTime=time.time()
+
+attribute_names=np.array(["SALT","TEMP","U","V","W"])
+#attribute_names=np.array(["SALT","TEMP","U","V","W"])
+all_ensamble_data=np.empty([0,60,20,250,250])
+for name in attribute_names:
+    data=utilize.readRedSeaFile(name)
+    data=data.reshape(1,60,20,250,250)
+    all_ensamble_data=np.append(all_ensamble_data,data,axis=0)
+
+incremental_number=60
+
+conditions=np.array([[36,40],[26,30]])
+
+covBlockSize=5
+dataBlockSize=5
+binsNumber=128
+sizeZ=20
+sizeY=250
+sizeX=250
+minMaxBlockSize=2
+isMinMax=False
+
+print("start fit model")
+with tqdm(total=4, desc="Model fitting") as pbar:
+    #oursModel=multiVariant.multiDistCopula3D(all_ensamble_data,dataBlockSize,covBlockSize,binsNumber,[sizeZ,sizeY,sizeX],minMaxBlockSize,isMinMax)
+    oursModel=multiVariant.multiDistCopula3D.load(f"RedSea_{attribute_names.shape[0]}varaibles_{incremental_number}members_128Bins_dBlock5_cBlock5")
+    #conditions=np.array([[0,1e5],[3e10,5e10]])
+    #oursModel.fit()
+    print("ours complete fit")
+    pbar.update(1)
+    copulaBlockSize=2
+    copulaBaseModel=CopulaBase.multiVariantCopulaBase(all_ensamble_data,copulaBlockSize)
+    copulaBaseModel.fit()
+    print("copula complete fit")
+    pbar.update(1)
+    multiHistBlockSize=2
+    multiHistModel=multiHistogramSparse.multiHistogramSpaseModel(all_ensamble_data,blockSize=multiHistBlockSize,binsNumber=binsNumber)
+    multiHistModel.fit()
+    print("multi-hist complete fit")
+    pbar.update(1)
+    gtModel=multiHistogramSparse.multiHistogramSpaseModel(all_ensamble_data,blockSize=1,binsNumber=binsNumber)
+    gtModel.fit()
+
+    multiBinEdges=gtModel.vBinEdges
+
+    print("complete fit")
+    pbar.update(1)
+
+oursError=[]
+copulaError=[]
+mtError=[]
+
+
+#multiBinEdges=cp.asarray(multiBinEdges,dtype=cp.float32)
+
+
+with tqdm(total=sizeZ*sizeY*sizeX, desc="總進度") as pbar:
+    for idx in range(sizeZ * sizeY * sizeX):
+        
+        z = idx // (sizeY * sizeX)
+        y = (idx // sizeX) % sizeY
+        x = idx % sizeX        
+        ### GroundTruth ###
+
+        gtMultiHistModel=gtModel.getHistByPos(z,y,x)
+
+        ### ours method ###
+
+        oursSamples=oursModel.sampleByPos(z,y,x)
+        oursHistModel=multiHistogramSparse.SparseMultiHistogramBlock(bin_edges=multiBinEdges)
+        oursHistModel.add_samples(oursSamples)
+        oursHistModel.normalize()
+
+        rmse=multiHistogramSparse.rmseForSparseHistogram(gtMultiHistModel,oursHistModel)
+        oursError.append(rmse)
+
+       
+        ### copula Base ###
+    
+        copulaSamples=copulaBaseModel.sampleByPos(z,y,x)
+        copulaHistModel=multiHistogramSparse.SparseMultiHistogramBlock(bin_edges=multiBinEdges)
+        copulaHistModel.add_samples(copulaSamples)
+        copulaHistModel.normalize()
+      
+        rmse=multiHistogramSparse.rmseForSparseHistogram(gtMultiHistModel,copulaHistModel)
+        copulaError.append(rmse)
+        
+
+        ### multiHist ###
+
+        #ProcessTime=time.time()
+        #ProcessHistTime=time.time()
+        mtMultiHistModel=multiHistModel.getHistByPos(z,y,x)
+        #processHistTimeEnd=time.time()
+        #print(f"multi hist hist 執行時間:{processHistTimeEnd-ProcessHistTime}")
+        #processRmseTime=time.time()
+        rmse=multiHistogramSparse.rmseForSparseHistogram(gtMultiHistModel,mtMultiHistModel)
+        #processRmseTimeEnd=time.time()
+        #print(f"multi hist RMSE 執行時間:{processRmseTimeEnd-processRmseTime}")
+        mtError.append(rmse)
+
+        #ProcessTimeEnd=time.time()
+        #print(f"multi hist 執行時間:{ProcessTimeEnd-ProcessTime}")
+        
+        pbar.update(1)
+    
+
+oursError=np.array(oursError)
+copulaError=np.array(copulaError)
+mtError=np.array(mtError)
+
+oursError=oursError.mean()
+copulaError=copulaError.mean()
+mtError=mtError.mean()
+
+from datetime import datetime
+timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+Outputfilename = f"RedSea_{attribute_names.shape[0]}varaibles_{timestamp}.txt"
+end_Time=time.time()
+
+with open(Outputfilename , "w", encoding="utf-8") as f:
+    print(f"ours error:{oursError.mean()}",file=f)
+    print(f"copula error:{copulaError.mean()}",file=f)
+    print(f"mt error: {mtError.mean()}",file=f)
+    print(f"執行時間:{end_Time-startTime}",file=f)

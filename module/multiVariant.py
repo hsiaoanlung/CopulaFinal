@@ -181,7 +181,22 @@ class multiDistCopula3D():
         filePath=os.path.join(folderName,f"{FileName}.pkl")
         with open(filePath,"rb") as f:
             return pickle.load(f)
+    
+    def getStorageSize(self):
+        result=[]
+        for i in range(len(self.singleDistModels)):
+            result.append(self.singleDistModels[i].getStorageSize())
         
+        for i in range(len(self.singleDistModels)):
+            print(f"v{i}: {result[i]}")
+        
+        covStorageSize=(1+self.dim+((self.dim*(self.dim+1))/2))*len(self.multiCovModel.blocks)
+        print(f"cov:{covStorageSize}")
+        result=np.array(result)
+        sum=result.sum()+covStorageSize
+        print(f"sum:{sum}")
+
+
     def saveInfoToFile(self,FileName):
 
         folderName="model"

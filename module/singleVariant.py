@@ -87,6 +87,13 @@ class singleBlockDist3D():
     def getNonZeroBinsCount(self):
         counts=np.count_nonzero(self.hist)
         return counts 
+    
+    def getStorageSize(self):
+        binCounts=self.getNonZeroBinsCount()
+        Size=10*binCounts+2*binCounts
+
+        return Size
+    
     def getParmByBinNumber(self,binIdx):
         sum_z = self.correlations_p[0,0,binIdx]
         sum_y = self.correlations_p[0,1,binIdx]
@@ -308,8 +315,14 @@ class singleVariantDist3D():
         """
         for i in range(len(self.blocks)):
             self.blocks[i].fitData()
+    
+    def getStorageSize(self):
+        result=0
+        for i in range(len(self.blocks)):
+            result+=self.blocks[i].getStorageSize()
         
-        
+        return result
+    
     def reconst(self):
         
         mean_prob=np.zeros((self.sizeZ, self.sizeY, self.sizeX), dtype=np.float32)
