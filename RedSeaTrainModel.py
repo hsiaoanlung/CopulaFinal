@@ -11,22 +11,22 @@ reload(singleVariant)
 
 attribute_names=np.array(["SALT","TEMP","U","V","W"])
 
-all_ensamble_data=np.empty([0,180,20,250,250])
+all_ensamble_data=np.empty([0,240,30,180,180])
 for name in attribute_names:
     data=utilize.readRedSeaFile(name)
-    data=data.reshape(1,180,20,250,250)
+    data=data.reshape(1,240,30,180,180)
     all_ensamble_data=np.append(all_ensamble_data,data,axis=0)
 
-incremental_number=180
+incremental_number=240
 
 conditions=np.array([[36,40],[26,30]])
 
 covBlockSize=5
 dataBlockSize=5
 binsNumber=128
-sizeZ=20
-sizeY=250
-sizeX=250
+sizeZ=30
+sizeY=180
+sizeX=180
 minMaxBlockSize=2
 isMinMax=False
 

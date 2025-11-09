@@ -14,18 +14,6 @@ class SparseMultiHistogramBlock:
         self.total_count = 0.0
         self._cdf_cache = None  # for sampling
 
-    """
-    def _digitize(self, samples):
-        #Convert continuous samples to bin indices, matching np.histogramdd behavior.
-        indices = [
-            np.searchsorted(self.bin_edges[d], samples[:, d], side='right') - 1
-            for d in range(self.ndim)
-        ]
-        # Clip to ensure valid bin indices
-        for d in range(self.ndim):
-            indices[d] = np.clip(indices[d], 0, len(self.bin_edges[d]) - 2)
-        return np.stack(indices, axis=1)
-    """
     def _digitize(self, samples):
         """Convert continuous samples to bin indices."""
         indices = [
@@ -66,6 +54,12 @@ class SparseMultiHistogramBlock:
         highs = np.array([self.bin_edges[d][chosen_bins[:, d] + 1] for d in range(self.ndim)]).T
         r = np.random.rand(n_samples, self.ndim)
         return lows + r * (highs - lows)
+    
+    def to_coo(self):
+        """Convert to COO sparse format (indices, values)."""
+        coords = np.array(list(self.hist.keys()), dtype=np.int32)
+        values = np.array(list(self.hist.values()), dtype=np.float32)
+        return coords, values
     
     def getStorageSize(self):
         nonZeroBin=len(self.hist)
