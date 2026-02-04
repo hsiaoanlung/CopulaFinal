@@ -1,0 +1,4 @@
+Variable:2 ,binNumber:64, oursError:0.04385863049237443
+Variable:3 ,binNumber:64, oursError:0.04334447751197722
+Variable:4 ,binNumber:64, oursError:0.046790430072835114
+Variable:5 ,binNumber:64, oursError:0.046995374404657314

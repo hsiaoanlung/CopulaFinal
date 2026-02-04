@@ -128,6 +128,8 @@ class singleBlockDist3D():
 
         counts = self.correlations_p[1,5,binIdx]
         
+        if counts==0 or counts==1:
+            return covMatrix
         covMatrix[0,0] = (sum_z2-sum_z**2 / counts) / (counts-1)
         covMatrix[1,1] = (sum_y2-sum_y**2 / counts) / (counts-1)
         covMatrix[2,2] = (sum_x2-sum_x**2 / counts) / (counts-1)
@@ -159,10 +161,24 @@ class singleBlockDist3D():
         # z,y,x (mean)
         return np.array([self.correlations_p[0,0,binNumber]/counts, self.correlations_p[0,1,binNumber]/counts, self.correlations_p[1,1,binNumber]/counts])
     
-    def makePsd(self,covMatrix,epsilon=1e-6):
-        eigvals, eigvecs = np.linalg.eigh(covMatrix)
-        eigvals_clipped = np.clip(eigvals, a_min=epsilon, a_max=None)
+    def makePsd(self,covMatrix,epsilon=1e-5,decimals=6):
+
+        covMatrix = np.round(covMatrix, decimals=decimals)
+        # 1) 強制對稱避免浮點誤差
+        covSym = (covMatrix + covMatrix.T) / 2
+
+        # 2) eigen decomposition
+        eigvals, eigvecs = np.linalg.eigh(covSym)
+
+        # 3) clip
+        eigvals_clipped = np.clip(eigvals, epsilon, None)
+
+        # 4) 重建
         cov_psd = eigvecs @ np.diag(eigvals_clipped) @ eigvecs.T
+
+        # 5) 再次強制對稱 (避免 round-off 導致不完全 PSD)
+        cov_psd = (cov_psd + cov_psd.T) / 2
+
         return cov_psd
     
     def getPointPdf(self,z,y,x):
@@ -177,7 +193,7 @@ class singleBlockDist3D():
 
             if np.any(eigvals<0):
                 covMatix=self.makePsd(covMatix)
-            
+
             """
             ## 走uniform流程
             if self.checkCovMatrixForUniform(covMatix,mean):
@@ -186,7 +202,19 @@ class singleBlockDist3D():
             ## 走gmm流程
             else: 
             """
-            mv_gaussian=multivariate_normal(mean=mean , cov=covMatix , allow_singular=True)
+
+            try:
+                mv_gaussian = multivariate_normal(mean=mean, cov=covMatix, allow_singular=True)
+
+            except ValueError as e:
+                print("❌ multivariate_normal failed!")
+                print("Error message:", e)
+                print("Covariance matrix was:")
+                print(covMatix.shape)
+                print(covMatix)
+                print(mean)
+                raise   # 若想讓程式停止可以保留這行，不想中斷就刪掉
+            # mv_gaussian=multivariate_normal(mean=mean , cov=covMatix , allow_singular=True)
             pos=np.array([z,y,x])
             pdfValues[binIdx]=mv_gaussian.pdf(pos)
         

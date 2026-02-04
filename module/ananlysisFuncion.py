@@ -38,7 +38,14 @@ def emd_sparse(coords_p, weights_p, coords_q, weights_q):
 
     # 距離矩陣（可用歐氏距離）
     M = ot.dist(coords_p, coords_q, metric='euclidean')
-    M /= M.max()  # normalize to [0, 1]
+    
+    mmax = M.max() # normalize to [0, 1]
+    if mmax != 0:
+        M = M / mmax
+    else:
+        M = M  # 或者做其他處理
+        return 0
+    #M /= M.max()  
 
     # 計算 EMD（Earth Mover’s Distance）
     emd_value = ot.emd2(p, q, M)

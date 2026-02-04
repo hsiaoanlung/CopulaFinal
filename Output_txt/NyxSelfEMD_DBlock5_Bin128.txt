@@ -1,0 +1,8 @@
+Variable:2 ,binNumber:128, oursError:0.036689258630432854
+Variable:3 ,binNumber:128, oursError:0.038448086883751335
+Variable:4 ,binNumber:128, oursError:0.04121863754157686
+Variable:5 ,binNumber:128, oursError:0.04266466475180606
+Variable:2 ,binNumber:128, oursError:0.03664974695273285
+Variable:3 ,binNumber:128, oursError:0.038437286768023625
+Variable:4 ,binNumber:128, oursError:0.04123715468677377
+Variable:5 ,binNumber:128, oursError:0.04262721872055673

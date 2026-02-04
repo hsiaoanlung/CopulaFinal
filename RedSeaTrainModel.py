@@ -22,14 +22,14 @@ incremental_number=240
 conditions=np.array([[36,40],[26,30]])
 
 covBlockSize=5
-dataBlockSize=5
+dataBlockSize=10
 binsNumber=128
 sizeZ=30
 sizeY=180
 sizeX=180
 minMaxBlockSize=2
 isMinMax=False
-
+print(f"binNumber:{binsNumber}")
 with tqdm(total=4, desc="總進度") as pbar:
     for i in range(2,6):
         data=all_ensamble_data[0:i, :, :, :, :]
